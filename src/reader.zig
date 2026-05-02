@@ -1,5 +1,5 @@
 const std = @import("std");
-const api = @import("api.zig");
+const api = @import("api.zig").Api;
 const trace = @import("trace.zig");
 
 var traced_field_string = false;
