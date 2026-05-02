@@ -2,7 +2,7 @@
     .name = .howl_lua,
     .version = "0.1.0-beta.1",
     .fingerprint = 0xeb690e93625687d6,
-    .minimum_zig_version = "0.15.2",
+    .minimum_zig_version = "0.16.0",
     .dependencies = .{},
     .paths = .{
         "build.zig",
