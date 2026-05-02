@@ -1,2 +1,4 @@
-pub const api = @import("api.zig");
-pub const reader = @import("reader.zig");
+pub const HowlLua = struct {
+    pub const Api = @import("api.zig");
+    pub const Reader = @import("reader.zig").Reader;
+};

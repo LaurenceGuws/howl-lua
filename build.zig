@@ -13,6 +13,7 @@ pub fn build(b: *std.Build) void {
     const tests = b.addTest(.{
         .root_module = mod,
     });
+    tests.use_llvm = true;
     tests.linkLibC();
     tests.root_module.linkSystemLibrary("lua5.4", .{ .use_pkg_config = .force });
 
