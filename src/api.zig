@@ -81,7 +81,7 @@ pub const State = struct {
     pub fn pushField(self: State, idx: c_int, name: []const u8) void {
         const abs_idx = self.absIndex(idx);
         _ = c.lua_pushlstring(self.raw, @ptrCast(name.ptr), name.len);
-        c.lua_gettable(self.raw, abs_idx);
+        _ = c.lua_gettable(self.raw, abs_idx);
     }
 
     pub fn isTable(self: State, idx: c_int) bool {
