@@ -92,6 +92,12 @@ Checkpoint 7 chosen scope:
 - harden internal trace-once flags against races
 - document tracing as internal best-effort debug behavior only
 
+Checkpoint 8 chosen scope:
+
+- sync package/docs hygiene with actual metadata
+- align README Zig requirement with `build.zig.zon`
+- make branch-vs-release-note roles explicit
+
 Acceptance target:
 
 - local planning is tracked here, not in the main Howl scratchpads

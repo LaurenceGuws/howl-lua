@@ -19,10 +19,11 @@ Current published version line:
 
 - package version: `0.1.0-beta.1`
 - release tag: `v0.1.0-beta.1`
+- current branch may contain later unreleased hardening work beyond that tag
 
 ## Requirements
 
-- Zig `0.15.2`
+- Zig `0.16.0`
 - Lua 5.4 development headers and library available through `pkg-config`
 
 ## Usage
@@ -90,3 +91,5 @@ const Reader = howl_lua.Reader;
 Release notes:
 
 - [v0.1.0-beta.1](docs/releases/v0.1.0-beta.1.md)
+
+That release note is historical for the published tag. The README describes the current branch surface.

@@ -256,3 +256,9 @@ Out of scope for checkpoint 3:
 - make internal trace-once flags atomic
 - keep tracing out of the public contract surface
 - document `HOWL_LUA_TRACE` as internal best-effort debug behavior only
+
+### Checkpoint 8: Package And Docs Hygiene
+
+- align README requirements with `build.zig.zon`
+- make current-branch README vs historical release-note roles explicit
+- include docs/release files in the packaged path set
