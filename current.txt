@@ -61,6 +61,13 @@ Checkpoint 2 chosen scope:
 - add invalid-input and repeated-failure proofs
 - remove `Reader.scalarStringOwned()` instead of trying to preserve its fuzzy semantics
 
+Checkpoint 3 chosen scope:
+
+- harden `Reader.stringOwned()` and `Reader.optionalStringOwned()`
+- make owned-string helpers failure-atomic
+- prove unchanged-on-missing/nil/non-string behavior
+- prove stack neutrality for owned-string helper paths
+
 Acceptance target:
 
 - local planning is tracked here, not in the main Howl scratchpads

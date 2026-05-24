@@ -214,3 +214,18 @@ Out of scope for checkpoint 2:
 - trace policy changes
 - ownership redesign
 - package/release restructuring
+
+### Checkpoint 3: Owned String Contract Hardening
+
+- harden `Reader.stringOwned()` and `Reader.optionalStringOwned()`
+- keep current effective semantic choice:
+  - actual string updates target
+  - missing / `nil` / non-string leaves target unchanged
+- make both helpers failure-atomic
+- add proof for unchanged behavior and stack neutrality
+
+Out of scope for checkpoint 3:
+
+- helper removal beyond checkpoint 2's `scalarStringOwned()` removal
+- host consumer updates
+- `State` / `TableIter` redesign

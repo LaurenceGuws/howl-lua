@@ -73,6 +73,9 @@ const Reader = howl_lua.Reader;
 - `State.readString()` returns borrowed Lua-managed bytes; copy them if they must outlive the current Lua value usage window.
 - `TableIter` is stack-scoped. Use `defer it.finish()` when iterating.
 - `Reader` is a stable view over a table already live on the Lua stack. Its immediate field helpers restore stack depth before returning.
+- `Reader.stringOwned()` and `Reader.optionalStringOwned()` only update their targets when the field is an actual Lua string.
+- missing, `nil`, and non-string fields leave owned-string targets unchanged.
+- owned-string helpers are failure-atomic: allocation failure preserves the caller's prior value.
 - `Reader.intField()` accepts only actual Lua integers.
 - `Reader.numberField()` accepts only actual Lua numbers and does not treat numeric strings as numbers.
 
