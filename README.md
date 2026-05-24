@@ -82,6 +82,11 @@ const Reader = howl_lua.Reader;
 - `Reader.intField()` accepts only actual Lua integers.
 - `Reader.numberField()` accepts only actual Lua numbers and does not treat numeric strings as numbers.
 
+## Trace
+
+- `HOWL_LUA_TRACE` enables internal best-effort debug tracing.
+- tracing is not part of the package contract surface; it is only for local debugging.
+
 Release notes:
 
 - [v0.1.0-beta.1](docs/releases/v0.1.0-beta.1.md)

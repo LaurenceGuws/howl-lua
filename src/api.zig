@@ -1,7 +1,7 @@
 const std = @import("std");
 const trace = @import("trace.zig");
 
-var traced_load_file = false;
+var traced_load_file = trace.OnceFlag.init(false);
 
 pub const c = @cImport({
     @cInclude("lua.h");

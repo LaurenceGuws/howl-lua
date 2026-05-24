@@ -87,6 +87,11 @@ Checkpoint 6 chosen scope:
 - keep the scalar read surface narrow around `boolField`, `intField`, and `numberField`
 - replace helper-specific tests with direct field-contract proofs
 
+Checkpoint 7 chosen scope:
+
+- harden internal trace-once flags against races
+- document tracing as internal best-effort debug behavior only
+
 Acceptance target:
 
 - local planning is tracked here, not in the main Howl scratchpads

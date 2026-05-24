@@ -250,3 +250,9 @@ Out of scope for checkpoint 3:
 - remove `Reader.intInto()` and `Reader.boolInto()`
 - keep the scalar read surface narrow around `boolField()`, `intField()`, and `numberField()`
 - replace helper-specific tests with direct field-contract proofs
+
+### Checkpoint 7: Trace Posture Tightening
+
+- make internal trace-once flags atomic
+- keep tracing out of the public contract surface
+- document `HOWL_LUA_TRACE` as internal best-effort debug behavior only

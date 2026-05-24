@@ -2,8 +2,8 @@ const std = @import("std");
 const api = @import("api.zig");
 const trace = @import("trace.zig");
 
-var traced_bool_field = false;
-var traced_number_field = false;
+var traced_bool_field = trace.OnceFlag.init(false);
+var traced_number_field = trace.OnceFlag.init(false);
 
 pub const ChildTable = struct {
     state: api.State,
