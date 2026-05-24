@@ -132,6 +132,7 @@ pub const State = struct {
     }
 
     pub fn tableIter(self: State, idx: c_int) TableIter {
+        std.debug.assert(self.isTable(idx));
         return .{
             .state = self,
             .index = self.absIndex(idx),
@@ -160,10 +161,12 @@ pub const TableIter = struct {
     }
 
     pub fn keyString(self: TableIter) ?[]const u8 {
+        std.debug.assert(self.active);
         return self.state.readString(-2);
     }
 
     pub fn valueString(self: TableIter) ?[]const u8 {
+        std.debug.assert(self.active);
         return self.state.readString(-1);
     }
 
@@ -281,4 +284,52 @@ test "loadFile runtime failure is stack neutral" {
     try std.testing.expectEqual(before, c.lua_gettop(lua.raw));
     try std.testing.expectError(error.InvalidValue, lua.loadFile(allocator, path));
     try std.testing.expectEqual(before, c.lua_gettop(lua.raw));
+}
+
+test "table iterator finish is safe before start and after exhaustion" {
+    const allocator = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.writeFile(.{ .sub_path = "iter-safe.lua", .data = "return { a = 1 }\n" });
+
+    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    const path = try tmp.dir.realpath("iter-safe.lua", &path_buf);
+
+    var lua = try State.init();
+    defer lua.deinit();
+    try lua.loadFile(allocator, path);
+
+    const before = c.lua_gettop(lua.raw);
+
+    var first = lua.tableIter(-1);
+    first.finish();
+    try std.testing.expectEqual(before, c.lua_gettop(lua.raw));
+    first.finish();
+    try std.testing.expectEqual(before, c.lua_gettop(lua.raw));
+
+    var second = lua.tableIter(-1);
+    while (second.next()) {}
+    try std.testing.expectEqual(before, c.lua_gettop(lua.raw));
+    second.finish();
+    try std.testing.expectEqual(before, c.lua_gettop(lua.raw));
+}
+
+test "table iterator string access returns null for non-string pairs" {
+    const allocator = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.writeFile(.{ .sub_path = "iter-null.lua", .data = "return { [1] = true }\n" });
+
+    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    const path = try tmp.dir.realpath("iter-null.lua", &path_buf);
+
+    var lua = try State.init();
+    defer lua.deinit();
+    try lua.loadFile(allocator, path);
+
+    var it = lua.tableIter(-1);
+    defer it.finish();
+    try std.testing.expect(it.next());
+    try std.testing.expect(it.keyString() == null);
+    try std.testing.expect(it.valueString() == null);
 }

@@ -28,6 +28,7 @@ pub const Reader = struct {
     index: c_int,
 
     pub fn init(state: api.State, allocator: std.mem.Allocator, index: c_int) Reader {
+        std.debug.assert(state.isTable(index));
         return .{
             .state = state,
             .allocator = allocator,
@@ -101,11 +102,13 @@ pub const Reader = struct {
     }
 
     pub fn arrayLen(self: Reader) usize {
+        std.debug.assert(self.state.isTable(self.index));
         return self.state.rawLen(self.index);
     }
 
     pub fn stringAtOwned(self: Reader, array_index: usize) !?[]u8 {
         std.debug.assert(array_index > 0);
+        std.debug.assert(self.state.isTable(self.index));
         self.state.pushArrayIndex(self.index, array_index);
         defer self.state.pop(1);
         const raw = self.state.readString(-1) orelse return null;
@@ -404,5 +407,28 @@ test "stringAtOwned reads ordered string array elements" {
 
     try std.testing.expect((try reader.stringAtOwned(3)) == null);
     try std.testing.expect((try reader.stringAtOwned(4)) == null);
+    try std.testing.expectEqual(before, api.c.lua_gettop(state.raw));
+}
+
+test "childTable finish is idempotent" {
+    const allocator = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.writeFile(.{ .sub_path = "child-finish.lua", .data = "return { child = { ok = true } }\n" });
+
+    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    const path = try tmp.dir.realpath("child-finish.lua", &path_buf);
+
+    var state = try api.State.init();
+    defer state.deinit();
+    try state.loadFile(allocator, path);
+
+    const root = Reader.init(state, allocator, -1);
+    const before = api.c.lua_gettop(state.raw);
+    var child = root.childTable("child") orelse return error.TestUnexpectedResult;
+    try std.testing.expectEqual(before + 1, api.c.lua_gettop(state.raw));
+    child.finish();
+    try std.testing.expectEqual(before, api.c.lua_gettop(state.raw));
+    child.finish();
     try std.testing.expectEqual(before, api.c.lua_gettop(state.raw));
 }

@@ -75,6 +75,12 @@ Checkpoint 4 chosen scope:
 - migrate real host config consumers off removed helpers and raw reach-through
 - keep `Reader` as a stable table view and keep stack scope explicit
 
+Checkpoint 5 chosen scope:
+
+- tighten table-only preconditions for `Reader` and `TableIter`
+- tighten iterator misuse-edge proofs
+- document the remaining borrow window and stack-scope rules clearly
+
 Acceptance target:
 
 - local planning is tracked here, not in the main Howl scratchpads

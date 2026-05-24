@@ -236,3 +236,11 @@ Out of scope for checkpoint 3:
 - add `Reader.stringAtOwned()` for ordered 1-based string-array access
 - migrate host config consumers off removed helpers and raw `reader.state` / `reader.index` reach-through
 - preserve the checkpoint-1 rule that `Reader` itself remains a stable table view only
+
+### Checkpoint 5: Table View And Iterator Contract Tightening
+
+- assert the table-only precondition for `Reader.init()` and `State.tableIter()`
+- assert array helper table-only preconditions
+- prove `TableIter.finish()` idempotence and exhaustion safety
+- prove non-string iterator key/value access returns `null` without stack damage
+- document the remaining borrow window and stack-scope rules clearly

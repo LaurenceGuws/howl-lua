@@ -71,8 +71,8 @@ const Reader = howl_lua.Reader;
 - `State` is owning-only in the current package surface.
 - `State.loadFile()` is stack-neutral on failure and leaves returned Lua values on the stack on success.
 - `State.readString()` returns borrowed Lua-managed bytes; copy them if they must outlive the current Lua value usage window.
-- `TableIter` is stack-scoped. Use `defer it.finish()` when iterating.
-- `Reader` is a stable view over a table already live on the Lua stack. Its immediate field helpers restore stack depth before returning.
+- `TableIter` is stack-scoped over a table only. Use `defer it.finish()` when iterating. Borrowed key/value strings are only valid while the current pair remains live.
+- `Reader` is a stable view over a table already live on the Lua stack. Construct it only for table values. Its immediate field helpers restore stack depth before returning.
 - `Reader.childTable()` returns an explicit stack-scoped child-table handle; use `defer child.finish()` and read through `child.view()` while that scope is live.
 - `Reader.stringAtOwned()` is the supported ordered string-array accessor for 1-based Lua array tables.
 - `Reader.stringOwned()` and `Reader.optionalStringOwned()` only update their targets when the field is an actual Lua string.
