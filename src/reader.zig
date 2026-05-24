@@ -2,7 +2,6 @@ const std = @import("std");
 const api = @import("api.zig");
 const trace = @import("trace.zig");
 
-var traced_field_string = false;
 var traced_bool_field = false;
 var traced_number_field = false;
 
@@ -19,21 +18,8 @@ pub const Reader = struct {
         };
     }
 
-    pub fn child(self: Reader, field: []const u8) ?Reader {
-        self.state.getField(self.index, field);
-        if (!self.state.isTable(-1)) {
-            self.state.pop(1);
-            return null;
-        }
-        return Reader.init(self.state, self.allocator, -1);
-    }
-
-    pub fn finish(self: Reader) void {
-        self.state.pop(1);
-    }
-
     pub fn stringOwned(self: Reader, field: []const u8, target: *[]u8) !void {
-        self.state.getField(self.index, field);
+        self.state.pushField(self.index, field);
         defer self.state.pop(1);
         if (self.state.readString(-1)) |raw| {
             self.allocator.free(target.*);
@@ -41,15 +27,8 @@ pub const Reader = struct {
         }
     }
 
-    pub fn fieldString(self: Reader, field: []const u8) ?[]const u8 {
-        self.state.getField(self.index, field);
-        defer self.state.pop(1);
-        trace.emitOnce(&traced_field_string, "reader.fieldString field={s}", .{field});
-        return self.state.readString(-1);
-    }
-
     pub fn optionalStringOwned(self: Reader, field: []const u8, target: *?[]u8) !void {
-        self.state.getField(self.index, field);
+        self.state.pushField(self.index, field);
         defer self.state.pop(1);
         if (self.state.readString(-1)) |raw| {
             if (target.*) |current| self.allocator.free(current);
@@ -58,7 +37,7 @@ pub const Reader = struct {
     }
 
     pub fn boolField(self: Reader, field: []const u8) ?bool {
-        self.state.getField(self.index, field);
+        self.state.pushField(self.index, field);
         defer self.state.pop(1);
         trace.emitOnce(&traced_bool_field, "reader.boolField field={s}", .{field});
         if (!self.state.isBoolean(-1)) return null;
@@ -66,26 +45,26 @@ pub const Reader = struct {
     }
 
     pub fn intInto(self: Reader, comptime T: type, field: []const u8, target: *T) void {
-        self.state.getField(self.index, field);
+        self.state.pushField(self.index, field);
         defer self.state.pop(1);
         if (self.state.isInteger(-1)) target.* = @intCast(self.state.readInteger(-1));
     }
 
     pub fn intField(self: Reader, field: []const u8) ?i64 {
-        self.state.getField(self.index, field);
+        self.state.pushField(self.index, field);
         defer self.state.pop(1);
         if (!self.state.isInteger(-1)) return null;
         return self.state.readInteger(-1);
     }
 
     pub fn boolInto(self: Reader, field: []const u8, target: *bool) void {
-        self.state.getField(self.index, field);
+        self.state.pushField(self.index, field);
         defer self.state.pop(1);
         if (self.state.valueType(-1) == api.c.LUA_TBOOLEAN) target.* = self.state.readBoolean(-1);
     }
 
     pub fn numberField(self: Reader, field: []const u8) ?f64 {
-        self.state.getField(self.index, field);
+        self.state.pushField(self.index, field);
         defer self.state.pop(1);
         trace.emitOnce(&traced_number_field, "reader.numberField field={s}", .{field});
         if (!self.state.isNumber(-1)) return null;
@@ -94,19 +73,6 @@ pub const Reader = struct {
 
     pub fn arrayLen(self: Reader) usize {
         return self.state.rawLen(self.index);
-    }
-
-    pub fn arrayItem(self: Reader, index_1_based: usize) ?Reader {
-        self.state.rawGetIndex(self.index, index_1_based);
-        if (!self.state.isTable(-1)) {
-            self.state.pop(1);
-            return null;
-        }
-        return Reader.init(self.state, self.allocator, -1);
-    }
-
-    pub fn iter(self: Reader) api.TableIter {
-        return self.state.tableIter(self.index);
     }
 
     pub fn scalarStringOwned(self: Reader, idx: c_int) ![]u8 {
@@ -145,4 +111,35 @@ test "reader reads typed table fields" {
     try std.testing.expectEqualStrings("ok", name);
     try std.testing.expectEqual(@as(u16, 7), count);
     try std.testing.expect(flag);
+}
+
+test "reader field helpers preserve stack depth" {
+    const allocator = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.writeFile(.{ .sub_path = "depth.lua", .data = "return { name = 'ok', count = 7, flag = true, ratio = 2.5 }\n" });
+
+    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    const path = try tmp.dir.realpath("depth.lua", &path_buf);
+
+    var state = try api.State.init();
+    defer state.deinit();
+    try state.loadFile(allocator, path);
+
+    const table_reader = Reader.init(state, allocator, -1);
+    const before = api.c.lua_gettop(state.raw);
+
+    _ = table_reader.boolField("flag");
+    try std.testing.expectEqual(before, api.c.lua_gettop(state.raw));
+
+    _ = table_reader.intField("count");
+    try std.testing.expectEqual(before, api.c.lua_gettop(state.raw));
+
+    _ = table_reader.numberField("ratio");
+    try std.testing.expectEqual(before, api.c.lua_gettop(state.raw));
+
+    var name = try allocator.dupe(u8, "x");
+    defer allocator.free(name);
+    try table_reader.stringOwned("name", &name);
+    try std.testing.expectEqual(before, api.c.lua_gettop(state.raw));
 }

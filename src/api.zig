@@ -1,7 +1,6 @@
 const std = @import("std");
 const trace = @import("trace.zig");
 
-var traced_from_raw = false;
 var traced_load_file = false;
 
 pub const c = @cImport({
@@ -26,11 +25,6 @@ pub const State = struct {
     pub fn init() LuaError!State {
         const raw = c.luaL_newstate() orelse return error.OutOfMemory;
         lua_l_openlibs(raw);
-        return .{ .raw = raw };
-    }
-
-    pub fn fromRaw(raw: *c.lua_State) State {
-        trace.emitOnce(&traced_from_raw, "api.fromRaw raw={*}", .{raw});
         return .{ .raw = raw };
     }
 
@@ -66,12 +60,14 @@ pub const State = struct {
         return @intCast(c.lua_rawlen(self.raw, idx));
     }
 
-    pub fn rawGetIndex(self: State, idx: c_int, array_index: usize) void {
+    pub fn pushArrayIndex(self: State, idx: c_int, array_index: usize) void {
         _ = c.lua_rawgeti(self.raw, idx, @intCast(array_index));
     }
 
-    pub fn getField(self: State, idx: c_int, name: []const u8) void {
-        _ = c.lua_getfield(self.raw, idx, @ptrCast(name.ptr));
+    pub fn pushField(self: State, idx: c_int, name: []const u8) void {
+        const abs_idx = self.absIndex(idx);
+        _ = c.lua_pushlstring(self.raw, @ptrCast(name.ptr), name.len);
+        c.lua_gettable(self.raw, abs_idx);
     }
 
     pub fn isTable(self: State, idx: c_int) bool {
@@ -103,6 +99,8 @@ pub const State = struct {
     }
 
     pub fn readString(self: State, idx: c_int) ?[]const u8 {
+        // Returned bytes are borrowed from Lua-managed string storage.
+        // Copy them before further Lua mutation or long-term retention.
         if (c.lua_type(self.raw, idx) != c.LUA_TSTRING) return null;
         var len: usize = 0;
         const ptr = c.lua_tolstring(self.raw, idx, &len) orelse return null;
@@ -134,6 +132,8 @@ pub const TableIter = struct {
             self.started = true;
         } else if (self.active) {
             c.lua_pop(self.state.raw, 1);
+        } else {
+            return false;
         }
         self.active = c.lua_next(self.state.raw, self.index) != 0;
         return self.active;
@@ -180,4 +180,47 @@ test "table iterator walks returned table" {
         }
     }
     try std.testing.expectEqual(@as(usize, 2), seen);
+}
+
+test "pushField reads non-sentinel field name safely" {
+    const allocator = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.writeFile(.{ .sub_path = "fields.lua", .data = "return { alpha = 'ok' }\n" });
+
+    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    const path = try tmp.dir.realpath("fields.lua", &path_buf);
+
+    var lua = try State.init();
+    defer lua.deinit();
+    try lua.loadFile(allocator, path);
+
+    const before = c.lua_gettop(lua.raw);
+    const field_name = [_]u8{ 'a', 'l', 'p', 'h', 'a' };
+    lua.pushField(-1, field_name[0..]);
+    defer lua.pop(1);
+
+    try std.testing.expectEqual(before + 1, c.lua_gettop(lua.raw));
+    try std.testing.expectEqualStrings("ok", lua.readString(-1) orelse return error.TestUnexpectedResult);
+}
+
+test "table iterator is safe to call next after exhaustion" {
+    const allocator = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.writeFile(.{ .sub_path = "empty.lua", .data = "return {}\n" });
+
+    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    const path = try tmp.dir.realpath("empty.lua", &path_buf);
+
+    var lua = try State.init();
+    defer lua.deinit();
+    try lua.loadFile(allocator, path);
+
+    var it = lua.tableIter(-1);
+    defer it.finish();
+
+    try std.testing.expect(!it.next());
+    try std.testing.expect(!it.next());
+    try std.testing.expectEqual(@as(c_int, 1), c.lua_gettop(lua.raw));
 }

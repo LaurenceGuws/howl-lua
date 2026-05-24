@@ -21,14 +21,42 @@ Current approach:
 3. prefer tightening existing surface over adding features
 4. keep the public API small and explicit
 
+Strict loop rule for this repo:
+
+- do not pass checkpoint 2 unless the public surface and contract shape are clearly the best small version
+- use derive/critique subagent pairs before implementation
+- no feature growth while ownership, stack, or lifetime rules are ambiguous
+
 Active next step:
 
-1. audit the current module surface and implementation quality
-2. identify the highest-risk correctness and contract gaps
-3. turn that into a narrow checkpoint queue inside `production-grade-scratchpad.md`
+1. lock checkpoint 1 as public-contract lockdown
+2. sharpen the ownership, FFI, stack, and borrowed-lifetime contract before general hardening
+3. update docs in the same checkpoint so the advertised surface is truthful
+
+Current checkpoint:
+
+- `checkpoint-01-public-contract-lockdown`
+
+Checkpoint 1 must settle:
+
+- `State` ownership semantics
+- `getField` field-name FFI contract
+- `Reader` / `TableIter` stack-scoped responsibilities
+- borrowed string lifetime rules
+- README/export truth
+
+Checkpoint 1 chosen shape:
+
+- `State` becomes owning-only
+- no public `fromRaw()` in this checkpoint
+- safe field lookup keeps Zig-facing `[]const u8` input and moves the C-string hazard out of the public API
+- `Reader` becomes a stable table view only
+- stack-scoped traversal/iteration responsibility is explicit instead of hidden in generic `Reader` values
+- no borrowed `Reader.fieldString()` survives this checkpoint
 
 Acceptance target:
 
 - local planning is tracked here, not in the main Howl scratchpads
-- the hardening plan is explicit
+- checkpoint 1 is explicit and narrow
+- no move to general hardening while contract shape still feels second-best
 - future passes improve truth, trust, correctness, and completeness rather than chasing feature progress

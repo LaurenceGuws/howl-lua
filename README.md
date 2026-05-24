@@ -4,9 +4,9 @@ Small reusable Zig helpers for embedding Lua 5.4 through the C API.
 
 Current surface:
 
-- `api.State`: Lua state lifecycle and stack helpers
-- `api.TableIter`: table iteration
-- `reader.Reader`: typed table access helpers for config-style Lua tables
+- `State`: owning Lua state lifecycle and stack helpers
+- `TableIter`: explicit stack-scoped table iteration
+- `Reader`: typed table reads for config-style Lua tables
 
 
 ## Status
@@ -60,9 +60,18 @@ Then in Zig:
 
 ```zig
 const howl_lua = @import("howl_lua");
-const api = howl_lua.api;
-const reader = howl_lua.reader;
+
+const State = howl_lua.State;
+const TableIter = howl_lua.TableIter;
+const Reader = howl_lua.Reader;
 ```
+
+## Contract Notes
+
+- `State` is owning-only in the current package surface.
+- `State.readString()` returns borrowed Lua-managed bytes; copy them if they must outlive the current Lua value usage window.
+- `TableIter` is stack-scoped. Use `defer it.finish()` when iterating.
+- `Reader` is a stable view over a table already live on the Lua stack. Its immediate field helpers restore stack depth before returning.
 
 Release notes:
 
