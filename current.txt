@@ -1,0 +1,34 @@
+Current Task
+
+Source:
+
+- `production-grade-scratchpad.md`
+
+Goal:
+
+- Make `howl-lua` production-grade as a small Zig module.
+- Keep planning local to this repo instead of cluttering main Howl product trackers.
+
+Repo boundary:
+
+- `howl-lua` is a Zig module, not a C ABI product.
+- It still must meet production-grade standards for correctness, ownership clarity, tests, and docs.
+
+Current approach:
+
+1. read the module at a high level first
+2. build a focused hardening queue
+3. prefer tightening existing surface over adding features
+4. keep the public API small and explicit
+
+Active next step:
+
+1. audit the current module surface and implementation quality
+2. identify the highest-risk correctness and contract gaps
+3. turn that into a narrow checkpoint queue inside `production-grade-scratchpad.md`
+
+Acceptance target:
+
+- local planning is tracked here, not in the main Howl scratchpads
+- the hardening plan is explicit
+- future passes improve truth, trust, correctness, and completeness rather than chasing feature progress

@@ -16,12 +16,16 @@ pub const LuaError = error{
     InvalidValue,
 };
 
+const lua_l_openlibs = @extern(*const fn (?*c.lua_State) callconv(.c) void, .{
+    .name = "luaL_openlibs",
+});
+
 pub const State = struct {
     raw: *c.lua_State,
 
     pub fn init() LuaError!State {
         const raw = c.luaL_newstate() orelse return error.OutOfMemory;
-        c.luaL_openlibs(raw);
+        lua_l_openlibs(raw);
         return .{ .raw = raw };
     }
 
