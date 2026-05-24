@@ -78,6 +78,7 @@ const Reader = howl_lua.Reader;
 - `Reader.stringOwned()` and `Reader.optionalStringOwned()` only update their targets when the field is an actual Lua string.
 - missing, `nil`, and non-string fields leave owned-string targets unchanged.
 - owned-string helpers are failure-atomic: allocation failure preserves the caller's prior value.
+- the supported scalar read surface is `boolField()`, `intField()`, and `numberField()`.
 - `Reader.intField()` accepts only actual Lua integers.
 - `Reader.numberField()` accepts only actual Lua numbers and does not treat numeric strings as numbers.
 

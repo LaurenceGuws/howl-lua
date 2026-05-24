@@ -73,24 +73,11 @@ pub const Reader = struct {
         return self.state.readBoolean(-1);
     }
 
-    pub fn intInto(self: Reader, comptime T: type, field: []const u8, target: *T) void {
-        self.state.pushField(self.index, field);
-        defer self.state.pop(1);
-        const value = self.state.readInteger(-1) orelse return;
-        target.* = std.math.cast(T, value) orelse return;
-    }
-
     pub fn intField(self: Reader, field: []const u8) ?i64 {
         self.state.pushField(self.index, field);
         defer self.state.pop(1);
         if (!self.state.isInteger(-1)) return null;
         return self.state.readInteger(-1);
-    }
-
-    pub fn boolInto(self: Reader, field: []const u8, target: *bool) void {
-        self.state.pushField(self.index, field);
-        defer self.state.pop(1);
-        if (self.state.valueType(-1) == api.c.LUA_TBOOLEAN) target.* = self.state.readBoolean(-1);
     }
 
     pub fn numberField(self: Reader, field: []const u8) ?f64 {
@@ -133,16 +120,12 @@ test "reader reads typed table fields" {
     const table_reader = Reader.init(state, allocator, -1);
     var name = try allocator.dupe(u8, "x");
     defer allocator.free(name);
-    var count: u16 = 0;
-    var flag = false;
 
     try table_reader.stringOwned("name", &name);
-    table_reader.intInto(u16, "count", &count);
-    table_reader.boolInto("flag", &flag);
 
     try std.testing.expectEqualStrings("ok", name);
-    try std.testing.expectEqual(@as(u16, 7), count);
-    try std.testing.expect(flag);
+    try std.testing.expectEqual(@as(i64, 7), table_reader.intField("count") orelse return error.TestUnexpectedResult);
+    try std.testing.expect(table_reader.boolField("flag") orelse return error.TestUnexpectedResult);
 }
 
 test "reader field helpers preserve stack depth" {
@@ -200,26 +183,22 @@ test "reader numeric field contracts are strict" {
     try std.testing.expect(reader.numberField("float_string") == null);
 }
 
-test "intInto ignores out-of-range values without trapping" {
+test "boolField rejects non-boolean values" {
     const allocator = std.testing.allocator;
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
-    try tmp.dir.writeFile(.{ .sub_path = "range.lua", .data = "return { huge = 500, exact = 12 }\n" });
+    try tmp.dir.writeFile(.{ .sub_path = "bools.lua", .data = "return { real = true, fake = 1 }\n" });
 
     var path_buf: [std.fs.max_path_bytes]u8 = undefined;
-    const path = try tmp.dir.realpath("range.lua", &path_buf);
+    const path = try tmp.dir.realpath("bools.lua", &path_buf);
 
     var state = try api.State.init();
     defer state.deinit();
     try state.loadFile(allocator, path);
 
     const reader = Reader.init(state, allocator, -1);
-    var small: u8 = 9;
-    reader.intInto(u8, "huge", &small);
-    try std.testing.expectEqual(@as(u8, 9), small);
-
-    reader.intInto(u8, "exact", &small);
-    try std.testing.expectEqual(@as(u8, 12), small);
+    try std.testing.expect(reader.boolField("real") orelse return error.TestUnexpectedResult);
+    try std.testing.expect(reader.boolField("fake") == null);
 }
 
 test "stringOwned leaves target unchanged on missing or wrong-type field" {

@@ -81,6 +81,12 @@ Checkpoint 5 chosen scope:
 - tighten iterator misuse-edge proofs
 - document the remaining borrow window and stack-scope rules clearly
 
+Checkpoint 6 chosen scope:
+
+- remove unused convenience scalar setter-style helpers
+- keep the scalar read surface narrow around `boolField`, `intField`, and `numberField`
+- replace helper-specific tests with direct field-contract proofs
+
 Acceptance target:
 
 - local planning is tracked here, not in the main Howl scratchpads

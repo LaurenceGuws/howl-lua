@@ -244,3 +244,9 @@ Out of scope for checkpoint 3:
 - prove `TableIter.finish()` idempotence and exhaustion safety
 - prove non-string iterator key/value access returns `null` without stack damage
 - document the remaining borrow window and stack-scope rules clearly
+
+### Checkpoint 6: Convenience Surface Tightening
+
+- remove `Reader.intInto()` and `Reader.boolInto()`
+- keep the scalar read surface narrow around `boolField()`, `intField()`, and `numberField()`
+- replace helper-specific tests with direct field-contract proofs
