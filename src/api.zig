@@ -15,6 +15,13 @@ pub const LuaError = error{
     InvalidValue,
 };
 
+fn luaStatusError(status: c_int, default_err: LuaError) LuaError {
+    return switch (status) {
+        c.LUA_ERRMEM => error.OutOfMemory,
+        else => default_err,
+    };
+}
+
 const lua_l_openlibs = @extern(*const fn (?*c.lua_State) callconv(.c) void, .{
     .name = "luaL_openlibs",
 });
@@ -38,9 +45,16 @@ pub const State = struct {
         defer allocator.free(path_z);
 
         const filename: [*c]const u8 = @ptrCast(path_z.ptr);
-        if (c.luaL_loadfilex(self.raw, filename, null) != c.LUA_OK) return error.InvalidChunk;
-        if (c.lua_pcallk(self.raw, 0, c.LUA_MULTRET, 0, @as(c.lua_KContext, 0), null) != c.LUA_OK) {
-            return error.InvalidValue;
+        const load_status = c.luaL_loadfilex(self.raw, filename, null);
+        if (load_status != c.LUA_OK) {
+            self.pop(1);
+            return luaStatusError(load_status, error.InvalidChunk);
+        }
+
+        const call_status = c.lua_pcallk(self.raw, 0, c.LUA_MULTRET, 0, @as(c.lua_KContext, 0), null);
+        if (call_status != c.LUA_OK) {
+            self.pop(1);
+            return luaStatusError(call_status, error.InvalidValue);
         }
     }
 
@@ -79,19 +93,25 @@ pub const State = struct {
     }
 
     pub fn isNumber(self: State, idx: c_int) bool {
-        return c.lua_isnumber(self.raw, idx) != 0;
+        return c.lua_type(self.raw, idx) == c.LUA_TNUMBER;
     }
 
     pub fn isBoolean(self: State, idx: c_int) bool {
         return c.lua_type(self.raw, idx) == c.LUA_TBOOLEAN;
     }
 
-    pub fn readInteger(self: State, idx: c_int) i64 {
-        return c.lua_tointegerx(self.raw, idx, null);
+    pub fn readInteger(self: State, idx: c_int) ?i64 {
+        var success: c_int = 0;
+        const value = c.lua_tointegerx(self.raw, idx, &success);
+        if (success == 0) return null;
+        return value;
     }
 
-    pub fn readNumber(self: State, idx: c_int) f64 {
-        return c.lua_tonumberx(self.raw, idx, null);
+    pub fn readNumber(self: State, idx: c_int) ?f64 {
+        var success: c_int = 0;
+        const value = c.lua_tonumberx(self.raw, idx, &success);
+        if (success == 0) return null;
+        return value;
     }
 
     pub fn readBoolean(self: State, idx: c_int) bool {
@@ -223,4 +243,42 @@ test "table iterator is safe to call next after exhaustion" {
     try std.testing.expect(!it.next());
     try std.testing.expect(!it.next());
     try std.testing.expectEqual(@as(c_int, 1), c.lua_gettop(lua.raw));
+}
+
+test "loadFile syntax failure is stack neutral" {
+    const allocator = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.writeFile(.{ .sub_path = "bad.lua", .data = "return {\n" });
+
+    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    const path = try tmp.dir.realpath("bad.lua", &path_buf);
+
+    var lua = try State.init();
+    defer lua.deinit();
+
+    const before = c.lua_gettop(lua.raw);
+    try std.testing.expectError(error.InvalidChunk, lua.loadFile(allocator, path));
+    try std.testing.expectEqual(before, c.lua_gettop(lua.raw));
+    try std.testing.expectError(error.InvalidChunk, lua.loadFile(allocator, path));
+    try std.testing.expectEqual(before, c.lua_gettop(lua.raw));
+}
+
+test "loadFile runtime failure is stack neutral" {
+    const allocator = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.writeFile(.{ .sub_path = "runtime.lua", .data = "error('boom')\n" });
+
+    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    const path = try tmp.dir.realpath("runtime.lua", &path_buf);
+
+    var lua = try State.init();
+    defer lua.deinit();
+
+    const before = c.lua_gettop(lua.raw);
+    try std.testing.expectError(error.InvalidValue, lua.loadFile(allocator, path));
+    try std.testing.expectEqual(before, c.lua_gettop(lua.raw));
+    try std.testing.expectError(error.InvalidValue, lua.loadFile(allocator, path));
+    try std.testing.expectEqual(before, c.lua_gettop(lua.raw));
 }

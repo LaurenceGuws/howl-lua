@@ -200,9 +200,17 @@ Checkpoint-1 code target after this decision:
 
 Starts only after checkpoint 1 is proven and accepted.
 
-Likely scope after checkpoint 1:
+Chosen narrower scope after checkpoint 1:
 
+- `checkpoint-02-loadfile-and-numeric-contract-hardening`
 - tighten `loadFile()` failure contract
 - harden integer/number conversion behavior
-- strengthen tests around invalid inputs and misuse edges
-- decide whether any remaining convenience helpers should stay public
+- strengthen tests around invalid inputs and repeated failure
+- remove `Reader.scalarStringOwned()` instead of hardening it
+
+Out of scope for checkpoint 2:
+
+- further public helper pruning
+- trace policy changes
+- ownership redesign
+- package/release restructuring

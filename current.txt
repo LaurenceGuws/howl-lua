@@ -54,6 +54,13 @@ Checkpoint 1 chosen shape:
 - stack-scoped traversal/iteration responsibility is explicit instead of hidden in generic `Reader` values
 - no borrowed `Reader.fieldString()` survives this checkpoint
 
+Checkpoint 2 chosen scope:
+
+- harden `State.loadFile()` failure contract
+- harden numeric conversion behavior
+- add invalid-input and repeated-failure proofs
+- remove `Reader.scalarStringOwned()` instead of trying to preserve its fuzzy semantics
+
 Acceptance target:
 
 - local planning is tracked here, not in the main Howl scratchpads

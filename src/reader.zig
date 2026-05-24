@@ -47,7 +47,8 @@ pub const Reader = struct {
     pub fn intInto(self: Reader, comptime T: type, field: []const u8, target: *T) void {
         self.state.pushField(self.index, field);
         defer self.state.pop(1);
-        if (self.state.isInteger(-1)) target.* = @intCast(self.state.readInteger(-1));
+        const value = self.state.readInteger(-1) orelse return;
+        target.* = std.math.cast(T, value) orelse return;
     }
 
     pub fn intField(self: Reader, field: []const u8) ?i64 {
@@ -75,14 +76,6 @@ pub const Reader = struct {
         return self.state.rawLen(self.index);
     }
 
-    pub fn scalarStringOwned(self: Reader, idx: c_int) ![]u8 {
-        return switch (self.state.valueType(idx)) {
-            api.c.LUA_TSTRING => self.allocator.dupe(u8, self.state.readString(idx) orelse ""),
-            api.c.LUA_TBOOLEAN => self.allocator.dupe(u8, if (self.state.readBoolean(idx)) "true" else "false"),
-            api.c.LUA_TNUMBER => std.fmt.allocPrint(self.allocator, "{d}", .{self.state.readInteger(idx)}),
-            else => self.allocator.dupe(u8, ""),
-        };
-    }
 };
 
 test "reader reads typed table fields" {
@@ -142,4 +135,50 @@ test "reader field helpers preserve stack depth" {
     defer allocator.free(name);
     try table_reader.stringOwned("name", &name);
     try std.testing.expectEqual(before, api.c.lua_gettop(state.raw));
+}
+
+test "reader numeric field contracts are strict" {
+    const allocator = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.writeFile(.{ .sub_path = "numbers.lua", .data = "return { int_value = 7, float_value = 2.5, int_string = '7', float_string = '2.5' }\n" });
+
+    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    const path = try tmp.dir.realpath("numbers.lua", &path_buf);
+
+    var state = try api.State.init();
+    defer state.deinit();
+    try state.loadFile(allocator, path);
+
+    const reader = Reader.init(state, allocator, -1);
+
+    try std.testing.expectEqual(@as(i64, 7), reader.intField("int_value") orelse return error.TestUnexpectedResult);
+    try std.testing.expect(reader.intField("float_value") == null);
+    try std.testing.expect(reader.intField("int_string") == null);
+
+    try std.testing.expectEqual(@as(f64, 7), reader.numberField("int_value") orelse return error.TestUnexpectedResult);
+    try std.testing.expectEqual(@as(f64, 2.5), reader.numberField("float_value") orelse return error.TestUnexpectedResult);
+    try std.testing.expect(reader.numberField("float_string") == null);
+}
+
+test "intInto ignores out-of-range values without trapping" {
+    const allocator = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.writeFile(.{ .sub_path = "range.lua", .data = "return { huge = 500, exact = 12 }\n" });
+
+    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    const path = try tmp.dir.realpath("range.lua", &path_buf);
+
+    var state = try api.State.init();
+    defer state.deinit();
+    try state.loadFile(allocator, path);
+
+    const reader = Reader.init(state, allocator, -1);
+    var small: u8 = 9;
+    reader.intInto(u8, "huge", &small);
+    try std.testing.expectEqual(@as(u8, 9), small);
+
+    reader.intInto(u8, "exact", &small);
+    try std.testing.expectEqual(@as(u8, 12), small);
 }

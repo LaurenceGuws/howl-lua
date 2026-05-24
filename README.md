@@ -69,9 +69,12 @@ const Reader = howl_lua.Reader;
 ## Contract Notes
 
 - `State` is owning-only in the current package surface.
+- `State.loadFile()` is stack-neutral on failure and leaves returned Lua values on the stack on success.
 - `State.readString()` returns borrowed Lua-managed bytes; copy them if they must outlive the current Lua value usage window.
 - `TableIter` is stack-scoped. Use `defer it.finish()` when iterating.
 - `Reader` is a stable view over a table already live on the Lua stack. Its immediate field helpers restore stack depth before returning.
+- `Reader.intField()` accepts only actual Lua integers.
+- `Reader.numberField()` accepts only actual Lua numbers and does not treat numeric strings as numbers.
 
 Release notes:
 
