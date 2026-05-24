@@ -229,3 +229,10 @@ Out of scope for checkpoint 3:
 - helper removal beyond checkpoint 2's `scalarStringOwned()` removal
 - host consumer updates
 - `State` / `TableIter` redesign
+
+### Checkpoint 4: Explicit Nested And Array Traversal
+
+- add `Reader.childTable()` returning an explicit stack-scoped child-table handle
+- add `Reader.stringAtOwned()` for ordered 1-based string-array access
+- migrate host config consumers off removed helpers and raw `reader.state` / `reader.index` reach-through
+- preserve the checkpoint-1 rule that `Reader` itself remains a stable table view only

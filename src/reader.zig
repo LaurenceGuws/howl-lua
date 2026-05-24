@@ -5,6 +5,23 @@ const trace = @import("trace.zig");
 var traced_bool_field = false;
 var traced_number_field = false;
 
+pub const ChildTable = struct {
+    state: api.State,
+    allocator: std.mem.Allocator,
+    active: bool = true,
+
+    pub fn view(self: *const ChildTable) Reader {
+        std.debug.assert(self.active);
+        return Reader.init(self.state, self.allocator, -1);
+    }
+
+    pub fn finish(self: *ChildTable) void {
+        if (!self.active) return;
+        self.state.pop(1);
+        self.active = false;
+    }
+};
+
 pub const Reader = struct {
     state: api.State,
     allocator: std.mem.Allocator,
@@ -36,6 +53,15 @@ pub const Reader = struct {
             if (target.*) |current| self.allocator.free(current);
             target.* = owned;
         }
+    }
+
+    pub fn childTable(self: Reader, field: []const u8) ?ChildTable {
+        self.state.pushField(self.index, field);
+        if (!self.state.isTable(-1)) {
+            self.state.pop(1);
+            return null;
+        }
+        return .{ .state = self.state, .allocator = self.allocator };
     }
 
     pub fn boolField(self: Reader, field: []const u8) ?bool {
@@ -76,6 +102,14 @@ pub const Reader = struct {
 
     pub fn arrayLen(self: Reader) usize {
         return self.state.rawLen(self.index);
+    }
+
+    pub fn stringAtOwned(self: Reader, array_index: usize) !?[]u8 {
+        std.debug.assert(array_index > 0);
+        self.state.pushArrayIndex(self.index, array_index);
+        defer self.state.pop(1);
+        const raw = self.state.readString(-1) orelse return null;
+        return try self.allocator.dupe(u8, raw);
     }
 
 };
@@ -304,4 +338,71 @@ test "owned string helpers preserve prior value on allocation failure" {
     try std.testing.expectEqualStrings("keep2", optional orelse return error.TestUnexpectedResult);
 
     _ = reader;
+}
+
+test "childTable is stack scoped and nullable" {
+    const allocator = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.writeFile(.{ .sub_path = "child.lua", .data = "return { child = { name = 'ok' }, wrong = true }\n" });
+
+    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    const path = try tmp.dir.realpath("child.lua", &path_buf);
+
+    var state = try api.State.init();
+    defer state.deinit();
+    try state.loadFile(allocator, path);
+
+    const root = Reader.init(state, allocator, -1);
+    const before = api.c.lua_gettop(state.raw);
+
+    try std.testing.expect(root.childTable("missing") == null);
+    try std.testing.expectEqual(before, api.c.lua_gettop(state.raw));
+
+    try std.testing.expect(root.childTable("wrong") == null);
+    try std.testing.expectEqual(before, api.c.lua_gettop(state.raw));
+
+    var child = root.childTable("child") orelse return error.TestUnexpectedResult;
+    defer child.finish();
+    try std.testing.expectEqual(before + 1, api.c.lua_gettop(state.raw));
+    const child_reader = child.view();
+
+    var name = try allocator.dupe(u8, "x");
+    defer allocator.free(name);
+    try child_reader.stringOwned("name", &name);
+    try std.testing.expectEqualStrings("ok", name);
+}
+
+test "stringAtOwned reads ordered string array elements" {
+    const allocator = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.writeFile(.{ .sub_path = "array.lua", .data = "return { items = { 'a', 'b', false } }\n" });
+
+    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    const path = try tmp.dir.realpath("array.lua", &path_buf);
+
+    var state = try api.State.init();
+    defer state.deinit();
+    try state.loadFile(allocator, path);
+
+    const root = Reader.init(state, allocator, -1);
+    var items = root.childTable("items") orelse return error.TestUnexpectedResult;
+    defer items.finish();
+    const reader = items.view();
+    const before = api.c.lua_gettop(state.raw);
+
+    const first = try reader.stringAtOwned(1) orelse return error.TestUnexpectedResult;
+    defer allocator.free(first);
+    try std.testing.expectEqualStrings("a", first);
+    try std.testing.expectEqual(before, api.c.lua_gettop(state.raw));
+
+    const second = try reader.stringAtOwned(2) orelse return error.TestUnexpectedResult;
+    defer allocator.free(second);
+    try std.testing.expectEqualStrings("b", second);
+    try std.testing.expectEqual(before, api.c.lua_gettop(state.raw));
+
+    try std.testing.expect((try reader.stringAtOwned(3)) == null);
+    try std.testing.expect((try reader.stringAtOwned(4)) == null);
+    try std.testing.expectEqual(before, api.c.lua_gettop(state.raw));
 }

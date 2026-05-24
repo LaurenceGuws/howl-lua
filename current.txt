@@ -68,6 +68,13 @@ Checkpoint 3 chosen scope:
 - prove unchanged-on-missing/nil/non-string behavior
 - prove stack neutrality for owned-string helper paths
 
+Checkpoint 4 chosen scope:
+
+- add the smallest supported nested-table replacement
+- add the supported ordered string-array accessor
+- migrate real host config consumers off removed helpers and raw reach-through
+- keep `Reader` as a stable table view and keep stack scope explicit
+
 Acceptance target:
 
 - local planning is tracked here, not in the main Howl scratchpads
